@@ -2,10 +2,8 @@ import { useState, useEffect } from 'react';
 import { FileText } from 'lucide-react';
 
 export function TransactionTable() {
-  // 1. Estado para guardar las transacciones que vienen de Rust
   const [transactions, setTransactions] = useState([]);
 
-  // 2. Fetch a tu API cuando el componente carga
   useEffect(() => {
     fetch('http://127.0.0.1:3000/api/transactions')
       .then(response => response.json())
@@ -17,39 +15,55 @@ export function TransactionTable() {
   }, []);
 
   const renderBadge = (tipo) => {
+    // Normalizamos a minúsculas para evitar fallos de case-sensitivity
+    const t = tipo?.toLowerCase();
     const styles = {
       'p2p_buy': 'bg-[#2E3C2E] text-[#4ADE80]',
+      'compra': 'bg-[#2E3C2E] text-[#4ADE80]', // Soporte para el dummy data "Compra"
       'p2p_sell': 'bg-[#3C2E2E] text-[#F87171]',
       'cash_in': 'bg-[#2E363C] text-[#60A5FA]',
       'pay': 'bg-[#3C382E] text-[#FBBF24]',
     };
     const labels = {
       'p2p_buy': 'BUY',
+      'compra': 'BUY',
       'p2p_sell': 'SELL',
       'cash_in': 'IN',
       'pay': 'PAY'
     };
-    return <span className={`px-2 py-0.5 rounded text-xs font-semibold tracking-wider ${styles[tipo]}`}>{labels[tipo]}</span>;
+    return <span className={`px-2 py-0.5 rounded text-xs font-semibold tracking-wider ${styles[t] || 'bg-gray-700'}`}>{labels[t] || t}</span>;
   };
 
   const renderStatus = (estado) => {
+    if (!estado) return null;
+
+    // Normalizamos el valor del Enum de la BD para que coincida con el objeto
+    const e = estado.toLowerCase();
+
     const styles = {
       'completada': 'text-[#4ADE80]',
+      'completed': 'text-[#4ADE80]', // Match con el dummy data 'Completed'
       'en_curso': 'text-[#FBBF24]',
+      'processing': 'text-[#FBBF24]',
       'cancelada': 'text-[#F87171]',
+      'cancelled': 'text-[#F87171]',
     };
+
+    // Si el estado no existe en nuestro diccionario, usamos un color neutro
+    const colorClass = styles[e] || 'text-gray-400';
+    const dotClass = colorClass.replace('text', 'bg');
+
     return (
       <div className="flex items-center gap-2">
-        <div className={`w-1.5 h-1.5 rounded-full ${styles[estado].replace('text', 'bg')}`}></div>
-        <span className={`text-sm capitalize ${styles[estado]}`}>{estado.replace('_', ' ')}</span>
+        <div className={`w-1.5 h-1.5 rounded-full ${dotClass}`}></div>
+        <span className={`text-sm capitalize ${colorClass}`}>{e.replace('_', ' ')}</span>
       </div>
     );
   };
 
-  // Función simple para que la fecha de la base de datos se vea bonita
   const formatearFecha = (fechaString) => {
     const fecha = new Date(fechaString);
-    return fecha.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+    return isNaN(fecha) ? "Fecha inválida" : fecha.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
   return (
@@ -67,10 +81,10 @@ export function TransactionTable() {
           <thead>
             <tr className="text-gray-400 text-sm border-b border-notion-border bg-notion-sidebar/50">
               <th className="px-4 py-3 font-medium flex items-center gap-2">📅 fecha</th>
-              <th className="px-4 py-3 font-medium"># monto</th>
-              <th className="px-4 py-3 font-medium"># total fiat</th>
-              <th className="px-4 py-3 font-medium">≡ tipo</th>
-              <th className="px-4 py-3 font-medium">⊙ activo</th>
+              <th className="px-4 py-3 font-medium"># Monto</th>
+              <th className="px-4 py-3 font-medium"># Bolivares</th>
+              <th className="px-4 py-3 font-medium">≡ Tipo</th>
+              <th className="px-4 py-3 font-medium">⊙ Activo</th>
               <th className="px-4 py-3 font-medium">⚙ Estado</th>
               <th className="px-4 py-3 font-medium">Aa ID orden</th>
             </tr>
@@ -99,7 +113,7 @@ export function TransactionTable() {
           </tbody>
         </table>
       </div>
-      
+
       <div className="px-4 py-3 text-xs text-gray-500 border-t border-notion-border flex justify-between">
         <span>SHOWING {transactions.length} TRANSACTIONS</span>
       </div>

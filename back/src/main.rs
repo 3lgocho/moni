@@ -1,5 +1,6 @@
 mod models;
-
+mod scraper;
+use scraper::run_scraper; // Traes la función al scope
 use axum::{http::Method, routing::get, Json, Router};
 use models::Transaction;
 use sqlx::{mysql::MySqlPoolOptions, MySqlPool};
@@ -11,7 +12,7 @@ async fn main() {
     // 1. Cargar el .env
     dotenvy::dotenv().ok();
     let db_url = env::var("DATABASE_URL").expect("Falta DATABASE_URL en el .env");
-
+    
     // 2. Conectar al Pool de MariaDB
     println!("⏳ Conectando a MariaDB...");
     let pool = MySqlPoolOptions::new()
@@ -22,19 +23,27 @@ async fn main() {
     
     println!("✅ Conexión a MariaDB exitosa!");
 
-    // 3. Configurar CORS (Para que React en el puerto 5173 pueda pedir datos al puerto 3000 sin bloqueo)
+    let db_name: (String,) = sqlx::query_as("SELECT DATABASE()").fetch_one(&pool).await.unwrap();
+    println!("🕵️ Rust está insertando datos en la base de datos: {}", db_name.0);
+    
+    // 3. Ejecutar el Scraper pasándole la conexión
+    if let Err(e) = run_scraper(&pool).await {
+        eprintln!("Error en el scraper: {}", e);
+    }
+
+    // 4. Configurar CORS (Para que React en el puerto 5173 pueda pedir datos al puerto 3000 sin bloqueo)
     let cors = CorsLayer::new()
         .allow_origin(Any) // En producción esto se restringe
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_headers(Any);
 
-    // 4. Configurar las rutas y pasarle el "pool" de la BD
+    // 5. Configurar las rutas y pasarle el "pool" de la BD
     let app = Router::new()
         .route("/api/transactions", get(get_transactions))
         .layer(cors)
         .with_state(pool); // Inyectamos la conexión a la base de datos en Axum
 
-    // 5. Levantar Servidor
+    // 6. Levantar Servidor
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await.unwrap();
     println!("🚀 Servidor backend corriendo en http://127.0.0.1:3000");
     
