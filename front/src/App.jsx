@@ -1,4 +1,5 @@
 import { Search, Wallet, LayoutDashboard, Settings, Plus } from 'lucide-react';
+import { TransactionTable } from './components/TransactionTable';
 
 function App() {
   return (
@@ -43,7 +44,7 @@ function App() {
         <header className="px-12 py-8 flex items-center gap-8 max-w-5xl">
           <h1 className="text-4xl font-bold text-white tracking-tight">Moni</h1>
           
-          {/* SEARCH BAR (A la altura del título) */}
+          {/* SEARCH BAR */}
           <div className="flex items-center gap-2 bg-notion-sidebar border border-notion-border px-3 py-1.5 rounded-md flex-1 max-w-md focus-within:border-gray-500 transition-colors">
             <Search size={18} className="text-gray-500" />
             <input 
@@ -60,9 +61,9 @@ function App() {
             An editorial approach to tracking assets and daily trade executions.
           </p>
           
-          <div className="h-64 border border-dashed border-notion-border rounded-lg flex items-center justify-center text-gray-500">
-            [ Área de Widgets Financieros ]
-          </div>
+          {/* AQUÍ LLAMAMOS AL COMPONENTE EXTERNO */}
+          <TransactionTable />
+          
         </div>
 
       </main>
