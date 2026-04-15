@@ -1,34 +1,8 @@
-import { useState, useEffect } from 'react'; // <-- 1. Añadimos los hooks de React
 import { Search, Wallet, LayoutDashboard, Settings, Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { TransactionTable } from './components/TransactionTable';
 import { StatCard } from './components/StatCard';
 
 function App() {
-  // --- 2. ESTADO: Aquí guardaremos lo que responda el backend ---
-  const [stats, setStats] = useState({
-    total_balance: 0,
-    income_volume: 0,
-    outcome_volume: 0
-  });
-
-  // --- 3. FETCH: Buscamos los datos apenas carga la página ---
-  useEffect(() => {
-    fetch('http://127.0.0.1:3000/api/stats')
-      .then(response => response.json())
-      .then(data => setStats(data))
-      .catch(error => console.error("Error al cargar los stats:", error));
-  }, []);
-
-  // --- 4. FORMATEADOR: Convierte "1504.7" en "$1,504.70" ---
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(value || 0);
-  };
-
   return (
     <div className="flex h-screen bg-notion-bg text-notion-text font-sans">
 
@@ -41,6 +15,7 @@ function App() {
           <span className="font-semibold text-sm">Moni Workspace</span>
         </div>
 
+        {/* Cambiado de text-gray-400 a text-zinc-400 */}
         <nav className="flex-1 px-2 py-4 space-y-1 text-sm text-zinc-400">
           <button className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md bg-notion-hover text-zinc-200">
             <LayoutDashboard size={18} />
@@ -67,7 +42,7 @@ function App() {
       {/* MAIN CONTENT */}
       <main className="flex-1 flex flex-col">
 
-        {/* HEADER */}
+        {/* HEADER: Reducido el padding de py-8 a py-6 y text-4xl a text-3xl */}
         <header className="px-12 py-6 flex items-center gap-8 max-w-5xl">
           <h1 className="text-3xl font-bold text-zinc-100 tracking-tight">Moni</h1>
 
@@ -88,23 +63,23 @@ function App() {
             An editorial approach to tracking assets and daily trade executions.
           </p>
 
-          {/* --- 5. STAT CARDS CON DATOS DINÁMICOS --- */}
+          {/* Debajo del párrafo de descripción y ANTES de <TransactionTable /> */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             <StatCard
               title="Total Balance"
-              value={formatCurrency(stats.total_balance)}
+              value="$1,240.50"
               icon={Wallet}
               type="neutral"
             />
             <StatCard
-              title="Income Volume"
-              value={"+" + formatCurrency(stats.income_volume)}
+              title="Income"
+              value="+$3,450.00"
               icon={ArrowUpRight}
               type="income"
             />
             <StatCard
-              title="Outcome Volume"
-              value={"-" + formatCurrency(stats.outcome_volume)}
+              title="Outcome"
+              value="-$2,209.50"
               icon={ArrowDownRight}
               type="outcome"
             />
