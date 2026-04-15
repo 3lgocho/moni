@@ -1,6 +1,7 @@
 mod models;
 mod scraper;
-use scraper::run_scraper; // Traes la función al scope
+mod handlers;
+
 use axum::{http::Method, routing::get, Json, Router};
 use models::Transaction;
 use sqlx::{mysql::MySqlPoolOptions, MySqlPool};
@@ -23,14 +24,18 @@ async fn main() {
     
     println!("✅ Conexión a MariaDB exitosa!");
 
-    let db_name: (String,) = sqlx::query_as("SELECT DATABASE()").fetch_one(&pool).await.unwrap();
-    println!("🕵️ Rust está insertando datos en la base de datos: {}", db_name.0);
-    
-    // 3. Ejecutar el Scraper pasándole la conexión
-    if let Err(e) = run_scraper(&pool).await {
-        eprintln!("Error en el scraper: {}", e);
+    let _db_name: (String,) = sqlx::query_as("SELECT DATABASE()").fetch_one(&pool).await.unwrap();
+    println!("🕵️ Iniciando sincronización de datos...");
+
+    // 1. Sincronizamos el Balance Total primero
+    if let Err(e) = scraper::sync_total_balance(&pool).await {
+        eprintln!("❌ Error sincronizando balance: {}", e);
     }
 
+    // 2. Luego corremos tu scraper P2P original
+    if let Err(e) = scraper::run_scraper(&pool).await {
+        eprintln!("❌ Error en el scraper P2P: {}", e);
+    }
     // 4. Configurar CORS (Para que React en el puerto 5173 pueda pedir datos al puerto 3000 sin bloqueo)
     let cors = CorsLayer::new()
         .allow_origin(Any) // En producción esto se restringe
@@ -40,6 +45,7 @@ async fn main() {
     // 5. Configurar las rutas y pasarle el "pool" de la BD
     let app = Router::new()
         .route("/api/transactions", get(get_transactions))
+        .route("/api/stats", get(handlers::get_stats))
         .layer(cors)
         .with_state(pool); // Inyectamos la conexión a la base de datos en Axum
 

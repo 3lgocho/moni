@@ -1,9 +1,11 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --color-notion-bg: #191919;
   --color-notion-sidebar: #202020;
-  --color-notion-text: #D4D4D4;
+  /* Cambiamos el D4D4D4 (neutro) por un equivalente más cercano a zinc-200 */
+  --color-notion-text: #e4e4e7;
   --color-notion-border: #2E2E2E;
   --color-notion-hover: #2C2C2C;
 }
@@ -11,4 +13,7 @@
 body {
   background-color: var(--color-notion-bg);
   color: var(--color-notion-text);
+  /* Esto afina el grosor de la fuente, clave para el estilo Notion */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

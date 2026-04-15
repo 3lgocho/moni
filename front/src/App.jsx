@@ -1,29 +1,56 @@
-import { Search, Wallet, LayoutDashboard, Settings, Plus } from 'lucide-react';
+import { useState, useEffect } from 'react'; // <-- 1. Añadimos los hooks de React
+import { Search, Wallet, LayoutDashboard, Settings, Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { TransactionTable } from './components/TransactionTable';
+import { StatCard } from './components/StatCard';
 
 function App() {
+  // --- 2. ESTADO: Aquí guardaremos lo que responda el backend ---
+  const [stats, setStats] = useState({
+    total_balance: 0,
+    income_volume: 0,
+    outcome_volume: 0
+  });
+
+  // --- 3. FETCH: Buscamos los datos apenas carga la página ---
+  useEffect(() => {
+    fetch('http://127.0.0.1:3000/api/stats')
+      .then(response => response.json())
+      .then(data => setStats(data))
+      .catch(error => console.error("Error al cargar los stats:", error));
+  }, []);
+
+  // --- 4. FORMATEADOR: Convierte "1504.7" en "$1,504.70" ---
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value || 0);
+  };
+
   return (
     <div className="flex h-screen bg-notion-bg text-notion-text font-sans">
-      
+
       {/* SIDEBAR */}
       <aside className="w-64 bg-notion-sidebar border-r border-notion-border flex flex-col">
-        <div className="p-4 flex items-center gap-2 cursor-pointer hover:bg-notion-hover transition-colors">
-          <div className="w-6 h-6 bg-gray-400 rounded-sm flex items-center justify-center text-notion-bg text-xs font-bold">
+        <div className="p-4 flex items-center gap-2 cursor-pointer border-b border-notion-border hover:bg-notion-hover transition-colors">
+          <div className="w-6 h-6 bg-zinc-400 rounded-sm flex items-center justify-center text-notion-bg text-xs font-bold">
             M
           </div>
           <span className="font-semibold text-sm">Moni Workspace</span>
         </div>
 
-        <nav className="flex-1 px-2 py-4 space-y-1 text-sm text-gray-400">
-          <button className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md bg-notion-hover text-gray-200">
+        <nav className="flex-1 px-2 py-4 space-y-1 text-sm text-zinc-400">
+          <button className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md bg-notion-hover text-zinc-200">
             <LayoutDashboard size={18} />
             Dashboard
           </button>
-          <button className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-notion-hover transition-colors">
+          <button className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-notion-hover hover:text-zinc-200 transition-colors">
             <Wallet size={18} />
             Transacciones
           </button>
-          <button className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-notion-hover transition-colors">
+          <button className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-notion-hover hover:text-zinc-200 transition-colors">
             <Settings size={18} />
             Configuración
           </button>
@@ -39,31 +66,52 @@ function App() {
 
       {/* MAIN CONTENT */}
       <main className="flex-1 flex flex-col">
-        
+
         {/* HEADER */}
-        <header className="px-12 py-8 flex items-center gap-8 max-w-5xl">
-          <h1 className="text-4xl font-bold text-white tracking-tight">Moni</h1>
-          
+        <header className="px-12 py-6 flex items-center gap-8 max-w-5xl">
+          <h1 className="text-3xl font-bold text-zinc-100 tracking-tight">Moni</h1>
+
           {/* SEARCH BAR */}
-          <div className="flex items-center gap-2 bg-notion-sidebar border border-notion-border px-3 py-1.5 rounded-md flex-1 max-w-md focus-within:border-gray-500 transition-colors">
-            <Search size={18} className="text-gray-500" />
-            <input 
-              type="text" 
-              placeholder="Search transactions..." 
-              className="bg-transparent border-none outline-none text-sm w-full placeholder-gray-500 text-gray-200"
+          <div className="flex items-center gap-2 bg-notion-sidebar border border-notion-border px-3 py-1.5 rounded-md flex-1 max-w-md focus-within:border-zinc-500 transition-colors">
+            <Search size={18} className="text-zinc-500" />
+            <input
+              type="text"
+              placeholder="Search transactions..."
+              className="bg-transparent border-none outline-none text-sm w-full placeholder-zinc-500 text-zinc-200"
             />
           </div>
         </header>
 
         {/* CONTENT AREA */}
         <div className="px-12 max-w-5xl w-full">
-          <p className="text-gray-400 text-sm mb-8">
+          <p className="text-zinc-400 text-sm mb-8">
             An editorial approach to tracking assets and daily trade executions.
           </p>
-          
-          {/* AQUÍ LLAMAMOS AL COMPONENTE EXTERNO */}
+
+          {/* --- 5. STAT CARDS CON DATOS DINÁMICOS --- */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <StatCard
+              title="Total Balance"
+              value={formatCurrency(stats.total_balance)}
+              icon={Wallet}
+              type="neutral"
+            />
+            <StatCard
+              title="Income Volume"
+              value={"+" + formatCurrency(stats.income_volume)}
+              icon={ArrowUpRight}
+              type="income"
+            />
+            <StatCard
+              title="Outcome Volume"
+              value={"-" + formatCurrency(stats.outcome_volume)}
+              icon={ArrowDownRight}
+              type="outcome"
+            />
+          </div>
+
           <TransactionTable />
-          
+
         </div>
 
       </main>
