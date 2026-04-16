@@ -1,120 +1,154 @@
-import { useState, useEffect } from 'react'; // <-- 1. Añadimos los hooks de React
-import { Search, Wallet, LayoutDashboard, Settings, Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, Wallet, LayoutDashboard, Settings, Plus, ArrowUpRight, ArrowDownRight, Menu, List } from 'lucide-react';
 import { TransactionTable } from './components/TransactionTable';
 import { StatCard } from './components/StatCard';
 
 function App() {
-  // --- 2. ESTADO: Aquí guardaremos lo que responda el backend ---
-  const [stats, setStats] = useState({
-    total_balance: 0,
-    income_volume: 0,
-    outcome_volume: 0
-  });
+  const [stats, setStats] = useState({ total_balance: 0, income_volume: 0, outcome_volume: 0 });
+  const [summary, setSummary] = useState({ income: 0, outcome: 0 });
+  const [timeFilter, setTimeFilter] = useState('week');
 
-  // --- 3. FETCH: Buscamos los datos apenas carga la página ---
-  useEffect(() => {
+  const fetchStats = () => {
     fetch('http://127.0.0.1:3000/api/stats')
-      .then(response => response.json())
+      .then(r => r.json())
       .then(data => setStats(data))
-      .catch(error => console.error("Error al cargar los stats:", error));
-  }, []);
-
-  // --- 4. FORMATEADOR: Convierte "1504.7" en "$1,504.70" ---
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(value || 0);
+      .catch(e => console.error("Error stats:", e));
   };
 
-  return (
-    <div className="flex h-screen bg-notion-bg text-notion-text font-sans">
+  const fetchSummary = (filter) => {
+    fetch(`http://127.0.0.1:3000/api/summary?filter=${filter}`)
+      .then(r => r.json())
+      .then(data => setSummary(data))
+      .catch(e => console.error("Error summary:", e));
+  };
 
+  useEffect(() => {
+    fetchStats();
+    fetchSummary(timeFilter);
+  }, []);
+
+  useEffect(() => {
+    fetchSummary(timeFilter);
+  }, [timeFilter]);
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2
+    }).format(Math.abs(value || 0));
+  };
+
+  const netFlow = summary.income - summary.outcome;
+  const isPositiveFlow = netFlow >= 0;
+  const NetFlowIcon = isPositiveFlow ? ArrowUpRight : ArrowDownRight;
+  const netFlowType = isPositiveFlow ? 'income' : 'outcome';
+  const netFlowPrefix = isPositiveFlow ? "+" : "-";
+
+  // Etiquetas para los subtítulos de las cards
+  const filterLabels = { 'week': 'ESTA SEMANA', 'month': 'ESTE MES', 'all': 'HISTÓRICO' };
+
+  return (
+    <div className="flex h-screen bg-notion-bg text-notion-text font-sans overflow-hidden">
+      
       {/* SIDEBAR */}
-      <aside className="w-64 bg-notion-sidebar border-r border-notion-border flex flex-col">
+      <aside className="hidden md:flex w-64 bg-notion-sidebar border-r border-notion-border flex-col shrink-0">
         <div className="p-4 flex items-center gap-2 cursor-pointer border-b border-notion-border hover:bg-notion-hover transition-colors">
-          <div className="w-6 h-6 bg-zinc-400 rounded-sm flex items-center justify-center text-notion-bg text-xs font-bold">
-            M
-          </div>
+          <div className="w-6 h-6 bg-zinc-400 rounded-sm flex items-center justify-center text-notion-bg text-xs font-bold">M</div>
           <span className="font-semibold text-sm">Moni Workspace</span>
         </div>
-
         <nav className="flex-1 px-2 py-4 space-y-1 text-sm text-zinc-400">
-          <button className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md bg-notion-hover text-zinc-200">
-            <LayoutDashboard size={18} />
-            Dashboard
-          </button>
-          <button className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-notion-hover hover:text-zinc-200 transition-colors">
-            <Wallet size={18} />
-            Transacciones
-          </button>
-          <button className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-notion-hover hover:text-zinc-200 transition-colors">
-            <Settings size={18} />
-            Configuración
-          </button>
+          <button className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md bg-notion-hover text-zinc-200"><LayoutDashboard size={18} />Dashboard</button>
+          <button className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-notion-hover hover:text-zinc-200 transition-colors"><List size={18} />Wishlist</button>
+          <button className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-notion-hover hover:text-zinc-200 transition-colors"><Wallet size={18} />Transacciones</button>
+          <button className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-notion-hover hover:text-zinc-200 transition-colors"><Settings size={18} />Configuración</button>
         </nav>
-
         <div className="p-4 border-t border-notion-border">
-          <button className="w-full flex items-center gap-2 bg-[#2EA043] text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-[#3FB950] transition-colors">
-            <Plus size={16} />
-            Nueva Entrada
-          </button>
+          <button className="w-full flex items-center gap-2 bg-[#2EA043] text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-[#3FB950] transition-colors"><Plus size={16} />Nueva Entrada</button>
         </div>
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 flex flex-col">
-
+      <main className="flex-1 flex flex-col h-full overflow-y-auto pb-20 md:pb-0">
+        
         {/* HEADER */}
-        <header className="px-12 py-6 flex items-center gap-8 max-w-5xl">
-          <h1 className="text-3xl font-bold text-zinc-100 tracking-tight">Moni</h1>
-
-          {/* SEARCH BAR */}
-          <div className="flex items-center gap-2 bg-notion-sidebar border border-notion-border px-3 py-1.5 rounded-md flex-1 max-w-md focus-within:border-zinc-500 transition-colors">
+        <header className="px-4 md:px-12 py-6 flex items-center gap-4 md:gap-8 max-w-5xl mx-auto w-full">
+          <button className="md:hidden text-zinc-400 hover:text-zinc-200"><Menu size={24} /></button>
+          <h1 className="text-2xl md:text-3xl font-bold text-zinc-100 tracking-tight">Moni</h1>
+          <div className="flex items-center gap-2 bg-notion-sidebar border border-notion-border px-3 py-1.5 rounded-md flex-1 max-w-md focus-within:border-zinc-500 transition-colors ml-auto md:ml-0">
             <Search size={18} className="text-zinc-500" />
-            <input
-              type="text"
-              placeholder="Search transactions..."
-              className="bg-transparent border-none outline-none text-sm w-full placeholder-zinc-500 text-zinc-200"
-            />
+            <input type="text" placeholder="Search..." className="bg-transparent border-none outline-none text-sm w-full placeholder-zinc-500 text-zinc-200" />
           </div>
         </header>
 
-        {/* CONTENT AREA */}
-        <div className="px-12 max-w-5xl w-full">
-          <p className="text-zinc-400 text-sm mb-8">
-            An editorial approach to tracking assets and daily trade executions.
-          </p>
+        <div className="px-4 md:px-12 max-w-5xl w-full mx-auto">
+          
+          {/* HEADER DEL DASHBOARD Y FILTRO GLOBAL */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+            <p className="hidden md:block text-zinc-400 text-sm">An editorial approach to tracking assets and daily trade executions.</p>
+            
+            {/* WIDGET: Selector de Tiempo Global */}
+            <div className="flex bg-zinc-900/80 p-1 rounded-xl border border-zinc-800/50 self-start sm:self-auto shadow-sm">
+              {[
+                { id: 'week', label: 'Semana' },
+                { id: 'month', label: 'Mes' },
+                { id: 'all', label: 'Todo' }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setTimeFilter(tab.id)}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                    timeFilter === tab.id
+                      ? "bg-zinc-800 text-zinc-100 shadow-sm" /* <--- ESTA ES LA LÍNEA QUE CAMBIA A GRIS */
+                      : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-          {/* --- 5. STAT CARDS CON DATOS DINÁMICOS --- */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          {/* GRID DE ESTADÍSTICAS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <StatCard
               title="Total Balance"
               value={formatCurrency(stats.total_balance)}
               icon={Wallet}
               type="neutral"
+              subtitle="ACTUAL"
             />
             <StatCard
-              title="Income Volume"
-              value={"+" + formatCurrency(stats.income_volume)}
+              title="Income"
+              value={"+" + formatCurrency(summary.income)}
               icon={ArrowUpRight}
               type="income"
+              subtitle={filterLabels[timeFilter]}
             />
             <StatCard
-              title="Outcome Volume"
-              value={"-" + formatCurrency(stats.outcome_volume)}
+              title="Outcome"
+              value={"-" + formatCurrency(summary.outcome)}
               icon={ArrowDownRight}
               type="outcome"
+              subtitle={filterLabels[timeFilter]}
+            />
+            <StatCard
+              title="Flujo Neto"
+              value={netFlowPrefix + formatCurrency(netFlow)}
+              icon={NetFlowIcon}
+              type={netFlowType}
+              subtitle={filterLabels[timeFilter]}
             />
           </div>
 
-          <TransactionTable />
+          <TransactionTable onRefresh={() => { fetchStats(); fetchSummary(timeFilter); }} />
 
         </div>
-
       </main>
+
+      {/* MOBILE NAV (Sin cambios) */}
+      <nav className="md:hidden fixed bottom-0 left-0 w-full bg-notion-sidebar border-t border-notion-border flex justify-around items-center py-3 px-2 z-50">
+         {/* ... (tu código del nav móvil se mantiene igual) ... */}
+      </nav>
+
     </div>
   )
 }

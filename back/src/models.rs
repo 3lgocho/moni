@@ -78,3 +78,20 @@ pub struct BinanceDeposit {
     pub tx_id: String,
     pub insert_time: i64,
 }
+
+#[derive(Deserialize)]
+pub struct PaginationQuery {
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+#[derive(Deserialize)]
+pub struct SummaryQuery {
+    pub filter: Option<String>, // Esperará "week", "month" o vacio
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+pub struct FinancialSummary {
+    pub income: rust_decimal::Decimal,
+    pub outcome: rust_decimal::Decimal,
+}

@@ -2,7 +2,7 @@ mod models;
 mod scraper;
 mod handlers;
 
-use axum::{http::Method, routing::get, Json, Router};
+use axum::{http::Method, routing::{get, post}, Json, Router};
 use models::Transaction;
 use sqlx::{mysql::MySqlPoolOptions, MySqlPool};
 use std::env;
@@ -44,8 +44,10 @@ async fn main() {
 
     // 5. Configurar las rutas y pasarle el "pool" de la BD
     let app = Router::new()
-        .route("/api/transactions", get(get_transactions))
+        .route("/api/transactions", get(handlers::get_transactions))
         .route("/api/stats", get(handlers::get_stats))
+        .route("/api/summary", get(handlers::get_summary))
+        .route("/api/scrape", post(handlers::trigger_scrape))
         .layer(cors)
         .with_state(pool); // Inyectamos la conexión a la base de datos en Axum
 
