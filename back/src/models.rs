@@ -83,11 +83,14 @@ pub struct BinanceDeposit {
 pub struct PaginationQuery {
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+pub start_date: Option<String>, // "YYYY-MM-DD"
+    pub end_date: Option<String>,   // "YYYY-MM-DD"
 }
 
 #[derive(Deserialize)]
 pub struct SummaryQuery {
-    pub filter: Option<String>, // Esperará "week", "month" o vacio
+    pub start_date: Option<String>,
+    pub end_date: Option<String>,
 }
 
 #[derive(Serialize, sqlx::FromRow)]

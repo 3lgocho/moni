@@ -3,10 +3,60 @@ import { Search, Wallet, LayoutDashboard, Settings, Plus, ArrowUpRight, ArrowDow
 import { TransactionTable } from './components/TransactionTable';
 import { StatCard } from './components/StatCard';
 
+const getDateRange = (filter, date) => {
+  const d = new Date(date);
+  if (filter === 'week') {
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Ajuste a Lunes
+    const start = new Date(d.setDate(diff));
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return {
+      start: start.toISOString().split('T')[0],
+      end: end.toISOString().split('T')[0]
+    };
+  }
+  if (filter === 'month') {
+    const start = new Date(d.getFullYear(), d.getMonth(), 1);
+    const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    return {
+      start: start.toISOString().split('T')[0],
+      end: end.toISOString().split('T')[0]
+    };
+  }
+  return { start: null, end: null };
+};
+
 function App() {
   const [stats, setStats] = useState({ total_balance: 0, income_volume: 0, outcome_volume: 0 });
   const [summary, setSummary] = useState({ income: 0, outcome: 0 });
+
+  // Estados de navegación
   const [timeFilter, setTimeFilter] = useState('week');
+  const [referenceDate, setReferenceDate] = useState(new Date());
+
+  const currentRange = getDateRange(timeFilter, referenceDate);
+
+  // Funciones de navegación para viajar en el tiempo
+  const navigateNext = () => {
+    const newDate = new Date(referenceDate);
+    if (timeFilter === 'week') newDate.setDate(newDate.getDate() + 7);
+    else if (timeFilter === 'month') newDate.setMonth(newDate.getMonth() + 1);
+    setReferenceDate(newDate);
+  };
+
+  const navigatePrev = () => {
+    const newDate = new Date(referenceDate);
+    if (timeFilter === 'week') newDate.setDate(newDate.getDate() - 7);
+    else if (timeFilter === 'month') newDate.setMonth(newDate.getMonth() - 1);
+    setReferenceDate(newDate);
+  };
+
+  // Resetear la fecha de referencia a HOY si cambias el filtro (de Semana a Mes, etc)
+  const handleFilterChange = (newFilter) => {
+    setTimeFilter(newFilter);
+    setReferenceDate(newDate());
+  };
 
   const fetchStats = () => {
     fetch('http://127.0.0.1:3000/api/stats')
@@ -15,21 +65,26 @@ function App() {
       .catch(e => console.error("Error stats:", e));
   };
 
-  const fetchSummary = (filter) => {
-    fetch(`http://127.0.0.1:3000/api/summary?filter=${filter}`)
+  const fetchSummary = (range) => {
+    const url = range.start
+      ? `http://127.0.0.1:3000/api/summary?start_date=${range.start}&end_date=${range.end}`
+      : `http://127.0.0.1:3000/api/summary?filter=all`;
+
+    fetch(url)
       .then(r => r.json())
       .then(data => setSummary(data))
       .catch(e => console.error("Error summary:", e));
   };
 
+  // Solo un useEffect para controlar las actualizaciones del summary según la fecha/filtro
+  useEffect(() => {
+    fetchSummary(currentRange);
+  }, [timeFilter, referenceDate]); // Se ejecuta al cambiar filtro o navegar
+
+  // Solo cargar los stats globales al iniciar (o al refrescar manualmente)
   useEffect(() => {
     fetchStats();
-    fetchSummary(timeFilter);
   }, []);
-
-  useEffect(() => {
-    fetchSummary(timeFilter);
-  }, [timeFilter]);
 
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('en-US', {
@@ -43,12 +98,10 @@ function App() {
   const netFlowType = isPositiveFlow ? 'income' : 'outcome';
   const netFlowPrefix = isPositiveFlow ? "+" : "-";
 
-  // Etiquetas para los subtítulos de las cards
   const filterLabels = { 'week': 'ESTA SEMANA', 'month': 'ESTE MES', 'all': 'HISTÓRICO' };
 
   return (
     <div className="flex h-screen bg-notion-bg text-notion-text font-sans overflow-hidden">
-      
       {/* SIDEBAR */}
       <aside className="hidden md:flex w-64 bg-notion-sidebar border-r border-notion-border flex-col shrink-0">
         <div className="p-4 flex items-center gap-2 cursor-pointer border-b border-notion-border hover:bg-notion-hover transition-colors">
@@ -68,7 +121,6 @@ function App() {
 
       {/* MAIN CONTENT */}
       <main className="flex-1 flex flex-col h-full overflow-y-auto pb-20 md:pb-0">
-        
         {/* HEADER */}
         <header className="px-4 md:px-12 py-6 flex items-center gap-4 md:gap-8 max-w-5xl mx-auto w-full">
           <button className="md:hidden text-zinc-400 hover:text-zinc-200"><Menu size={24} /></button>
@@ -80,12 +132,10 @@ function App() {
         </header>
 
         <div className="px-4 md:px-12 max-w-5xl w-full mx-auto">
-          
           {/* HEADER DEL DASHBOARD Y FILTRO GLOBAL */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
             <p className="hidden md:block text-zinc-400 text-sm">An editorial approach to tracking assets and daily trade executions.</p>
-            
-            {/* WIDGET: Selector de Tiempo Global */}
+
             <div className="flex bg-zinc-900/80 p-1 rounded-xl border border-zinc-800/50 self-start sm:self-auto shadow-sm">
               {[
                 { id: 'week', label: 'Semana' },
@@ -94,12 +144,11 @@ function App() {
               ].map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setTimeFilter(tab.id)}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                    timeFilter === tab.id
-                      ? "bg-zinc-800 text-zinc-100 shadow-sm" /* <--- ESTA ES LA LÍNEA QUE CAMBIA A GRIS */
-                      : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                  }`}
+                  onClick={() => handleFilterChange(tab.id)}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${timeFilter === tab.id
+                    ? "bg-zinc-800 text-zinc-100 shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -139,16 +188,20 @@ function App() {
             />
           </div>
 
-          <TransactionTable onRefresh={() => { fetchStats(); fetchSummary(timeFilter); }} />
-
+          {/* PASAMOS LOS PROPS DE FECHA Y NAVEGACIÓN A LA TABLA */}
+          <TransactionTable
+            currentRange={currentRange}
+            timeFilter={timeFilter}
+            onNext={navigateNext}
+            onPrev={navigatePrev}
+            onRefresh={() => { fetchStats(); fetchSummary(currentRange); }}
+          />
         </div>
       </main>
 
-      {/* MOBILE NAV (Sin cambios) */}
       <nav className="md:hidden fixed bottom-0 left-0 w-full bg-notion-sidebar border-t border-notion-border flex justify-around items-center py-3 px-2 z-50">
-         {/* ... (tu código del nav móvil se mantiene igual) ... */}
+        {/* Nav móvil */}
       </nav>
-
     </div>
   )
 }

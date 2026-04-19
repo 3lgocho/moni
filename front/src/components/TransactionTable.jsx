@@ -1,17 +1,21 @@
 import { useState, useEffect } from 'react';
 import { FileText, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 
-export function TransactionTable({ onRefresh }) {
+export function TransactionTable({ currentRange, timeFilter, onNext, onPrev, onRefresh }) {
   const [transactions, setTransactions] = useState([]);
-  
-  // NUEVO: Estados de paginación y carga
+
   const [page, setPage] = useState(0);
   const [isScraping, setIsScraping] = useState(false);
-  const limit = 50;
+  const limit = 10;
 
-  // NUEVO: Función separada para poder llamarla cuando queramos
   const fetchTransactions = () => {
-    fetch(`http://127.0.0.1:3000/api/transactions?limit=${limit}&offset=${page * limit}`)
+    let url = `http://127.0.0.1:3000/api/transactions?limit=${limit}&offset=${page * limit}`;
+
+    if (currentRange && currentRange.start) {
+      url += `&start_date=${currentRange.start}&end_date=${currentRange.end}`;
+    }
+
+    fetch(url)
       .then(response => response.json())
       .then(data => {
         setTransactions(data);
@@ -19,18 +23,20 @@ export function TransactionTable({ onRefresh }) {
       .catch(error => console.error("Error conectando al backend:", error));
   };
 
-  // Se ejecuta al cargar o cambiar de página
+  useEffect(() => {
+    setPage(0);
+  }, [currentRange, timeFilter]);
+
   useEffect(() => {
     fetchTransactions();
-  }, [page]);
+  }, [page, currentRange]);
 
-  // NUEVO: Dispara el scraper y avisa a App.jsx que actualice los Stats
   const handleActualizar = async () => {
     setIsScraping(true);
     try {
       await fetch('http://127.0.0.1:3000/api/scrape', { method: 'POST' });
-      fetchTransactions(); // Recarga esta tabla
-      if (onRefresh) onRefresh(); // Recarga los Stats de arriba
+      fetchTransactions();
+      if (onRefresh) onRefresh();
     } catch (error) {
       console.error("Error ejecutando scraper:", error);
     } finally {
@@ -42,7 +48,7 @@ export function TransactionTable({ onRefresh }) {
     const t = tipo?.toLowerCase();
     const styles = {
       'p2p_buy': 'bg-[#2E3C2E] text-[#4ADE80]',
-      'compra': 'bg-[#2E3C2E] text-[#4ADE80]', 
+      'compra': 'bg-[#2E3C2E] text-[#4ADE80]',
       'p2p_sell': 'bg-[#3C2E2E] text-[#F87171]',
       'cash_in': 'bg-[#2E363C] text-[#60A5FA]',
       'pay': 'bg-[#3C382E] text-[#FBBF24]',
@@ -55,7 +61,7 @@ export function TransactionTable({ onRefresh }) {
     if (!estado) return null;
     const e = estado.toLowerCase();
     const styles = {
-      'completada': 'text-[#4ADE80]', 'completed': 'text-[#4ADE80]', 
+      'completada': 'text-[#4ADE80]', 'completed': 'text-[#4ADE80]',
       'en_curso': 'text-[#FBBF24]', 'processing': 'text-[#FBBF24]',
       'cancelada': 'text-[#F87171]', 'cancelled': 'text-[#F87171]',
     };
@@ -74,19 +80,29 @@ export function TransactionTable({ onRefresh }) {
     return isNaN(fecha) ? "Fecha inválida" : fecha.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
+  // Obtenemos la fecha de hoy en formato YYYY-MM-DD
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  // DESHABILITAR FUTURO: Si la fecha de fin del rango es mayor o igual a hoy
+  const isNextDisabled = timeFilter === 'all' || (currentRange && currentRange.end >= todayStr);
+
+  // DESHABILITAR PASADO: Si la tabla ya no trajo datos.
+  // Nota: Esto asume que si llegas a una semana/mes vacío, es el fin de la historia. 
+  // (Si en el futuro tienes una semana sin transacciones en medio del mes, tendríamos que pedirle al backend la "fecha de tu primera transacción" para hacerlo 100% infalible).
+  const isPrevDisabled = timeFilter === 'all' || transactions.length === 0;
+
   return (
     <div className="mt-8 border border-notion-border rounded-lg bg-notion-bg overflow-hidden">
       <div className="flex items-center justify-between p-4 border-b border-notion-border">
         <h2 className="text-lg font-semibold text-white">Transacciones</h2>
-        
-        {/* NUEVO: Botón conectado al endpoint */}
-        <button 
+
+        <button
           onClick={handleActualizar}
           disabled={isScraping}
           className="bg-[#2EA043] hover:bg-[#3FB950] disabled:opacity-50 text-white text-sm font-medium px-3 py-1.5 rounded-md transition-colors flex items-center gap-2"
         >
-          {isScraping ? <RefreshCw size={14} className="animate-spin" /> : <span>Actualizar</span>}
-          <span className="text-xs opacity-70">▼</span>
+          <RefreshCw size={14} className={isScraping ? "animate-spin" : ""} />
+          <span>Actualizar</span>
         </button>
       </div>
 
@@ -105,7 +121,7 @@ export function TransactionTable({ onRefresh }) {
           </thead>
           <tbody className="text-sm divide-y divide-notion-border">
             {transactions.length === 0 ? (
-              <tr><td colSpan="7" className="text-center py-8 text-gray-500">No hay transacciones registradas</td></tr>
+              <tr><td colSpan="7" className="text-center py-8 text-gray-500">No hay transacciones registradas para este periodo</td></tr>
             ) : (
               transactions.map((tx) => (
                 <tr key={tx.id} className="hover:bg-notion-hover/50 transition-colors">
@@ -123,25 +139,58 @@ export function TransactionTable({ onRefresh }) {
         </table>
       </div>
 
-      {/* NUEVO: Controles de Paginación integrados a tu diseño */}
-      <div className="px-4 py-3 text-xs text-gray-500 border-t border-notion-border flex justify-between items-center bg-notion-sidebar/30">
-        <span className="uppercase font-semibold tracking-wider">PÁGINA {page + 1}</span>
-        <div className="flex gap-1">
-          <button 
-            onClick={() => setPage(p => Math.max(0, p - 1))}
-            disabled={page === 0}
+      {/* FOOTER: NAVEGACIÓN DE TIEMPO + PAGINACIÓN */}
+      <div className="px-4 py-3 text-xs text-gray-500 border-t border-notion-border flex flex-col sm:flex-row justify-between items-center gap-4 bg-notion-sidebar/30">
+
+        {/* NAVEGACIÓN EN EL TIEMPO (Semanas/Meses) */}
+        {/* NAVEGACIÓN EN EL TIEMPO (Semanas/Meses) */}
+        <div className="flex items-center gap-1 py-0">
+          {/* IZQUIERDA = HACIA ADELANTE (onNext) */}
+          <button
+            onClick={onNext}
+            disabled={isNextDisabled}
             className="p-1.5 rounded hover:bg-notion-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
-            <ChevronLeft size={16} />
+            <ChevronLeft size={22} />
           </button>
-          <button 
-            onClick={() => setPage(p => p + 1)}
-            disabled={transactions.length < limit}
+
+          <span className="px-3 py-2 bg-notion-sidebar border border-notion-border rounded-md text-zinc-300 text-xs font-medium tracking-wide">
+            {currentRange && currentRange.start
+              ? `${currentRange.start}  →  ${currentRange.end}`
+              : "Histórico Completo"}
+          </span>
+
+          {/* DERECHA = HACIA ATRÁS (onPrev) */}
+          <button
+            onClick={onPrev}
+            disabled={isPrevDisabled}
             className="p-1.5 rounded hover:bg-notion-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
-            <ChevronRight size={16} />
+            <ChevronRight size={22} />
           </button>
         </div>
+
+        {/* PAGINACIÓN DE FILAS (> 50 transacciones) */}
+        <div className="flex items-center gap-3">
+          <span className="uppercase font-semibold tracking-wider">PÁG {page + 1}</span>
+          <div className="flex gap-1">
+            <button
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="p-1.5 rounded hover:bg-notion-hover border-notion-border hover:bg-notion-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={22} />
+            </button>
+            <button
+              onClick={() => setPage(p => p + 1)}
+              disabled={transactions.length < limit}
+              className="p-1.5 rounded hover:bg-notion-hover border-notion-border hover:bg-notion-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight size={22} />
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
   );

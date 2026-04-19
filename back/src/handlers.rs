@@ -4,61 +4,77 @@ use sqlx::MySqlPool;
 use crate::models::{Transaction, PaginationQuery, SummaryQuery, FinancialSummary, DashboardStats};
 use rust_decimal::Decimal;
 
-// 1. GET TRANSACTIONS (Paginado)
+// 1. GET TRANSACTIONS (Paginado y Filtrado por Fechas)
 pub async fn get_transactions(
     State(pool): State<MySqlPool>,
-    Query(pagination): Query<PaginationQuery>,
+    Query(params): Query<PaginationQuery>,
 ) -> Result<Json<Vec<Transaction>>, String> {
     
-    let limit = pagination.limit.unwrap_or(50);
-    let offset = pagination.offset.unwrap_or(0);
+    let limit = params.limit.unwrap_or(50);
+    let offset = params.offset.unwrap_or(0);
 
-    let transactions = sqlx::query_as::<_, Transaction>(
-        r#"SELECT id, fecha, monto, total_fiat, tipo, activo, estado, id_orden 
-           FROM transactions 
-           ORDER BY fecha DESC 
-           LIMIT ? OFFSET ?"#
-    )
-    .bind(limit)
-    .bind(offset)
-    .fetch_all(&pool)
-    .await
-    .map_err(|e| e.to_string())?;
+    let transactions = if let (Some(start), Some(end)) = (&params.start_date, &params.end_date) {
+        // Ejecutamos la consulta inyectando (.bind) las variables start y end
+        sqlx::query_as::<_, Transaction>(
+            r#"SELECT id, fecha, monto, total_fiat, tipo, activo, estado, id_orden 
+               FROM transactions 
+               WHERE DATE(fecha) BETWEEN ? AND ?
+               ORDER BY fecha DESC LIMIT ? OFFSET ?"#
+        )
+        .bind(start)
+        .bind(end)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?
+    } else {
+        // Consulta por defecto si no mandan fechas
+        sqlx::query_as::<_, Transaction>(
+            r#"SELECT id, fecha, monto, total_fiat, tipo, activo, estado, id_orden 
+               FROM transactions 
+               ORDER BY fecha DESC LIMIT ? OFFSET ?"#
+        )
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?
+    };
 
     Ok(Json(transactions))
 }
 
-// 2. GET SUMMARY (El nuevo filtro dinámico para el Frontend gris)
+// 2. GET SUMMARY (Con filtro de fechas exactas)
 pub async fn get_summary(
     State(pool): State<MySqlPool>,
     Query(params): Query<SummaryQuery>,
 ) -> Result<Json<FinancialSummary>, String> {
     
-    let query = match params.filter.as_deref() {
-        Some("week") => r#"
+    let summary: FinancialSummary = if let (Some(start), Some(end)) = (&params.start_date, &params.end_date) {
+        sqlx::query_as(r#"
             SELECT 
                 COALESCE(SUM(CASE WHEN tipo IN ('BUY', 'crypto_deposit') AND estado = 'completed' THEN monto ELSE 0 END), 0) as income,
                 COALESCE(SUM(CASE WHEN tipo = 'SELL' AND estado = 'completed' THEN monto ELSE 0 END), 0) as outcome
             FROM transactions 
-            /* Se resta a HOY el número de día de la semana (Lunes=0) para siempre caer en el lunes actual */
-            WHERE fecha >= DATE(CURDATE() - INTERVAL WEEKDAY(CURDATE()) DAY)"#,
-        Some("month") => r#"
-            SELECT 
-                COALESCE(SUM(CASE WHEN tipo IN ('BUY', 'crypto_deposit') AND estado = 'completed' THEN monto ELSE 0 END), 0) as income,
-                COALESCE(SUM(CASE WHEN tipo = 'SELL' AND estado = 'completed' THEN monto ELSE 0 END), 0) as outcome
-            FROM transactions 
-            WHERE fecha >= DATE_FORMAT(CURDATE(), '%Y-%m-01')"#,
-        _ => r#"
-            SELECT 
-                COALESCE(SUM(CASE WHEN tipo IN ('BUY', 'crypto_deposit') AND estado = 'completed' THEN monto ELSE 0 END), 0) as income,
-                COALESCE(SUM(CASE WHEN tipo = 'SELL' AND estado = 'completed' THEN monto ELSE 0 END), 0) as outcome
-            FROM transactions"# 
-    };
-
-    let summary: FinancialSummary = sqlx::query_as(query)
+            WHERE DATE(fecha) BETWEEN ? AND ?"#
+        )
+        .bind(start)
+        .bind(end)
         .fetch_one(&pool)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?
+    } else {
+        sqlx::query_as(r#"
+            SELECT 
+                COALESCE(SUM(CASE WHEN tipo IN ('BUY', 'crypto_deposit') AND estado = 'completed' THEN monto ELSE 0 END), 0) as income,
+                COALESCE(SUM(CASE WHEN tipo = 'SELL' AND estado = 'completed' THEN monto ELSE 0 END), 0) as outcome
+            FROM transactions"#
+        )
+        .fetch_one(&pool)
+        .await
+        .map_err(|e| e.to_string())?
+    };
 
     Ok(Json(summary))
 }
