@@ -47,11 +47,12 @@ export function TransactionTable({ currentRange, timeFilter, onNext, onPrev, onR
   const renderBadge = (tipo) => {
     const t = tipo?.toLowerCase();
     const styles = {
-      'p2p_buy': 'bg-[#2E3C2E] text-[#4ADE80]',
+      'crypto_deposit': 'bg-[#2E3C2E] text-[#4ADE80]',
       'compra': 'bg-[#2E3C2E] text-[#4ADE80]',
-      'p2p_sell': 'bg-[#3C2E2E] text-[#F87171]',
-      'cash_in': 'bg-[#2E363C] text-[#60A5FA]',
+      'sell': 'bg-[#3C2E2E] text-[#F87171]',
+      'deposit': 'bg-[#2E363C] text-[#60A5FA]',
       'pay': 'bg-[#3C382E] text-[#FBBF24]',
+      'usdc': 'bg-[#2E363C] text-[#60A5FA]'
     };
     const labels = { 'p2p_buy': 'BUY', 'compra': 'BUY', 'p2p_sell': 'SELL', 'cash_in': 'IN', 'pay': 'PAY' };
     return <span className={`px-2 py-0.5 rounded text-xs font-semibold tracking-wider ${styles[t] || 'bg-gray-700'}`}>{labels[t] || t}</span>;
@@ -127,9 +128,9 @@ export function TransactionTable({ currentRange, timeFilter, onNext, onPrev, onR
                 <tr key={tx.id} className="hover:bg-notion-hover/50 transition-colors">
                   <td className="px-4 py-3 text-gray-300">{formatearFecha(tx.fecha)}</td>
                   <td className="px-4 py-3">{tx.monto}</td>
-                  <td className="px-4 py-3">{tx.total_fiat}</td>
+                  <td className="px-4 py-3">{parseFloat(tx.total_fiat || 0).toFixed(2)}</td>
                   <td className="px-4 py-3">{renderBadge(tx.tipo)}</td>
-                  <td className="px-4 py-3 text-gray-300">{tx.activo}</td>
+                  <td className="px-4 py-3">{renderBadge(tx.activo)}</td>
                   <td className="px-4 py-3">{renderStatus(tx.estado)}</td>
                   <td className="px-4 py-3 flex items-center gap-2 text-gray-400"><FileText size={14} />{tx.id_orden}</td>
                 </tr>
@@ -177,14 +178,14 @@ export function TransactionTable({ currentRange, timeFilter, onNext, onPrev, onR
             <button
               onClick={() => setPage(p => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="p-1.5 rounded hover:bg-notion-hover border-notion-border hover:bg-notion-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="p-1.5 rounded hover:bg-notion-hover border-notion-border disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronLeft size={22} />
             </button>
             <button
               onClick={() => setPage(p => p + 1)}
               disabled={transactions.length < limit}
-              className="p-1.5 rounded hover:bg-notion-hover border-notion-border hover:bg-notion-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="p-1.5 rounded hover:bg-notion-hover border-notion-border disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronRight size={22} />
             </button>

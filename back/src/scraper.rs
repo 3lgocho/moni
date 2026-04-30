@@ -94,11 +94,20 @@ pub async fn run_scraper(pool: &MySqlPool) -> Result<(), Box<dyn std::error::Err
     let api_secret = env::var("BINANCE_API_SECRET")?.trim().to_string();
 
     let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
-    let query_params = format!("page=1&rows=10&recvWindow=5000&timestamp={}", timestamp);
+    
+    // Timestamps para Enero 2026 (01/01 00:00:00 UTC al 31/01 23:59:59 UTC)
+    let start_timestamp: i64 = 1767225600000; 
+    let end_timestamp: i64 = 1769903999000;
+
+    // Inyectamos los límites de tiempo en la misma variable que ya tenías
+    let query_params = format!(
+        "startTimestamp={}&endTimestamp={}&page=1&rows=100&recvWindow=5000&timestamp={}",
+        start_timestamp, end_timestamp, timestamp
+    );
     let signature = firmar_query(&query_params, &api_secret);
 
     // ==========================================
-    // 1. EXTRAER ÓRDENES P2P
+    // 1. EXTRAER ÓRDENES P2P (MARZO 2026)
     // ==========================================
     let url_p2p = format!(
         "https://api.binance.com/sapi/v1/c2c/orderMatch/listUserOrderHistory?{}&signature={}",
