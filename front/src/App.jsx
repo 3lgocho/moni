@@ -2,89 +2,14 @@ import { useState, useEffect } from 'react';
 import { Search, Wallet, LayoutDashboard, Settings, Plus, ArrowUpRight, ArrowDownRight, Menu, List } from 'lucide-react';
 import { TransactionTable } from './components/TransactionTable';
 import { StatCard } from './components/StatCard';
-import { WishlistTable } from './components/WishlistTable'; // <-- 1. Importamos el componente
-
-const getDateRange = (filter, date) => {
-  const d = new Date(date);
-  if (filter === 'week') {
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    const start = new Date(d.setDate(diff));
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    return {
-      start: start.toISOString().split('T')[0],
-      end: end.toISOString().split('T')[0]
-    };
-  }
-  if (filter === 'month') {
-    const start = new Date(d.getFullYear(), d.getMonth(), 1);
-    const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-    return {
-      start: start.toISOString().split('T')[0],
-      end: end.toISOString().split('T')[0]
-    };
-  }
-  return { start: null, end: null };
-};
+import { WishlistGrid } from './components/WishlistGrid';
+import { useStats } from './hooks/useStats';
+import { Sidebar } from './components/sidebar';
+import { TimeFilter } from './components/Timefilter';
 
 function App() {
-  const [stats, setStats] = useState({ total_balance: 0, income_volume: 0, outcome_volume: 0 });
-  const [summary, setSummary] = useState({ income: 0, outcome: 0 });
-
-  // 2. Estado para controlar la vista actual (Navegación)
   const [activeTab, setActiveTab] = useState('dashboard');
-
-  // Estados de navegación de tiempo
-  const [timeFilter, setTimeFilter] = useState('week');
-  const [referenceDate, setReferenceDate] = useState(new Date());
-
-  const currentRange = getDateRange(timeFilter, referenceDate);
-
-  const navigateNext = () => {
-    const newDate = new Date(referenceDate);
-    if (timeFilter === 'week') newDate.setDate(newDate.getDate() + 7);
-    else if (timeFilter === 'month') newDate.setMonth(newDate.getMonth() + 1);
-    setReferenceDate(newDate);
-  };
-
-  const navigatePrev = () => {
-    const newDate = new Date(referenceDate);
-    if (timeFilter === 'week') newDate.setDate(newDate.getDate() - 7);
-    else if (timeFilter === 'month') newDate.setMonth(newDate.getMonth() - 1);
-    setReferenceDate(newDate);
-  };
-
-  const handleFilterChange = (newFilter) => {
-    setTimeFilter(newFilter);
-    setReferenceDate(new Date()); // Volvemos a hoy al cambiar de filtro
-  };
-
-  const fetchStats = () => {
-    fetch('http://127.0.0.1:3000/api/stats')
-      .then(r => r.json())
-      .then(data => setStats(data))
-      .catch(e => console.error("Error stats:", e));
-  };
-
-  const fetchSummary = (range) => {
-    const url = range.start
-      ? `http://127.0.0.1:3000/api/summary?start_date=${range.start}&end_date=${range.end}`
-      : `http://127.0.0.1:3000/api/summary?filter=all`;
-
-    fetch(url)
-      .then(r => r.json())
-      .then(data => setSummary(data))
-      .catch(e => console.error("Error summary:", e));
-  };
-
-  useEffect(() => {
-    fetchSummary(currentRange);
-  }, [timeFilter, referenceDate]);
-
-  useEffect(() => {
-    fetchStats();
-  }, []);
+  const { stats, summary, timeFilter, currentRange, navigateNext, navigatePrev, handleFilterChange, netFlow, isPositiveFlow, netFlowType, netFlowPrefix } = useStats();
 
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('en-US', {
@@ -92,51 +17,15 @@ function App() {
     }).format(Math.abs(value || 0));
   };
 
-  const netFlow = summary.income - summary.outcome;
-  const isPositiveFlow = netFlow >= 0;
   const NetFlowIcon = isPositiveFlow ? ArrowUpRight : ArrowDownRight;
-  const netFlowType = isPositiveFlow ? 'income' : 'outcome';
-  const netFlowPrefix = isPositiveFlow ? "+" : "-";
 
   const filterLabels = { 'week': 'ESTA SEMANA', 'month': 'ESTE MES', 'all': 'HISTÓRICO' };
 
   return (
     <div className="flex h-screen bg-notion-bg text-notion-text font-sans overflow-hidden">
-      {/* SIDEBAR */}
-      <aside className="hidden md:flex w-64 bg-notion-sidebar border-r border-notion-border flex-col shrink-0">
-        <div className="p-4 flex items-center gap-2 cursor-pointer border-b border-notion-border hover:bg-notion-hover transition-colors">
-          <div className="w-6 h-6 bg-zinc-400 rounded-sm flex items-center justify-center text-notion-bg text-xs font-bold">M</div>
-          <span className="font-semibold text-sm">Moni Workspace</span>
-        </div>
-        <nav className="flex-1 px-2 py-4 space-y-1 text-sm text-zinc-400">
-          {/* 3. Conectamos los botones para cambiar el activeTab */}
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-md transition-colors ${activeTab === 'dashboard' ? 'bg-notion-hover text-zinc-200' : 'hover:bg-notion-hover hover:text-zinc-200'}`}
-          >
-            <LayoutDashboard size={18} />Dashboard
-          </button>
-          <button
-            onClick={() => setActiveTab('wishlist')}
-            className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-md transition-colors ${activeTab === 'wishlist' ? 'bg-notion-hover text-zinc-200' : 'hover:bg-notion-hover hover:text-zinc-200'}`}
-          >
-            <List size={18} />Wishlist
-          </button>
-          <button className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-notion-hover hover:text-zinc-200 transition-colors">
-            <Wallet size={18} />Transacciones
-          </button>
-          <button className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-notion-hover hover:text-zinc-200 transition-colors">
-            <Settings size={18} />Configuración
-          </button>
-        </nav>
-        <div className="p-4 border-t border-notion-border">
-          <button className="w-full flex items-center gap-2 bg-[#2EA043] text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-[#3FB950] transition-colors"><Plus size={16} />Nueva Entrada</button>
-        </div>
-      </aside>
 
-      {/* MAIN CONTENT */}
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       <main className="flex-1 flex flex-col h-full overflow-y-auto pb-20 md:pb-0">
-        {/* HEADER GLOBAL */}
         <header className="px-4 md:px-12 py-6 flex items-center gap-4 md:gap-8 max-w-5xl mx-auto w-full">
           <button className="md:hidden text-zinc-400 hover:text-zinc-200"><Menu size={24} /></button>
           <h1 className="text-2xl md:text-3xl font-bold text-zinc-100 tracking-tight">Moni</h1>
@@ -152,27 +41,8 @@ function App() {
           {activeTab === 'dashboard' && (
             <>
               {/* HEADER DEL DASHBOARD Y FILTRO DE TIEMPO */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-                <p className="hidden md:block text-zinc-400 text-sm">An editorial approach to tracking assets and daily trade executions.</p>
-
-                <div className="flex bg-zinc-900/80 p-1 rounded-xl border border-zinc-800/50 self-start sm:self-auto shadow-sm">
-                  {[
-                    { id: 'week', label: 'Semana' },
-                    { id: 'month', label: 'Mes' },
-                    { id: 'all', label: 'Todo' }
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => handleFilterChange(tab.id)}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${timeFilter === tab.id
-                        ? "bg-zinc-800 text-zinc-100 shadow-sm"
-                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                        }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
+              <div className="flex flex-col md:flex-row md:items-center items-end justify-end mb-6 gap-4">
+                <TimeFilter timeFilter={timeFilter} onFilterChange={handleFilterChange} />
               </div>
 
               {/* GRID DE ESTADÍSTICAS */}
@@ -182,21 +52,32 @@ function App() {
                 <StatCard title="Outcome" value={"-" + formatCurrency(summary.outcome)} icon={ArrowDownRight} type="outcome" subtitle={filterLabels[timeFilter]} />
                 <StatCard title="Flujo Neto" value={netFlowPrefix + formatCurrency(netFlow)} icon={NetFlowIcon} type={netFlowType} subtitle={filterLabels[timeFilter]} />
               </div>
+              <div className="flex flex-col xl:flex-row gap-8 items-start">
 
-              <TransactionTable
-                currentRange={currentRange}
-                timeFilter={timeFilter}
-                onNext={navigateNext}
-                onPrev={navigatePrev}
-                onRefresh={() => { fetchStats(); fetchSummary(currentRange); }}
-              />
+                {/* LADO IZQUIERDO (Tabla): Toma todo el ancho disponible, pero con min-w-0 para que no se desborde */}
+                <div className="w-full xl:flex-1 min-w-0">
+                  {/* Envolvemos la tabla para controlar su margen superior que antes traía por defecto */}
+                  <div className="mt-0">
+                    <TransactionTable
+                      currentRange={currentRange}
+                      timeFilter={timeFilter}
+                      onNext={navigateNext}
+                      onPrev={navigatePrev}
+                      onRefresh={() => { fetchStats(); fetchSummary(currentRange); }} // Asumo que aún tienes el fetch en tu useStats
+                    />
+                  </div>
+                </div>
+
+                {/* LADO DERECHO (Wishlist): Ancho fijo en pantallas muy grandes, o fluido en medianas */}
+                <div className="w-full xl:w-[350px] shrink-0">
+                  <div className="-mt-6">
+                    <WishlistGrid />
+                  </div>
+                </div>
+
+              </div>
             </>
           )}
-
-          {activeTab === 'wishlist' && (
-            <WishlistTable />
-          )}
-
         </div>
       </main>
     </div>

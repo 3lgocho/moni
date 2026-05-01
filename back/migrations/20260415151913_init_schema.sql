@@ -20,3 +20,13 @@ CREATE TABLE IF NOT EXISTS balance_snapshots (
     earn_amount DECIMAL(18,8) NOT NULL,
     total_amount DECIMAL(18,8) NOT NULL
 );
+
+-- Tabla para la lista de deseos (Wishlist)
+CREATE TABLE IF NOT EXISTS wishlist (
+    id VARCHAR(255) PRIMARY KEY,
+    nombre VARCHAR(255) NOT NULL,
+    precio_usd DECIMAL(18,2) NOT NULL,
+    link TEXT,
+    prioridad VARCHAR(50) NOT NULL,
+    comprado BOOLEAN NOT NULL DEFAULT FALSE
+);
