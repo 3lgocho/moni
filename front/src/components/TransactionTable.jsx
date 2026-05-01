@@ -67,13 +67,17 @@ export function TransactionTable({ currentRange, timeFilter, onNext, onPrev, onR
   };
 
   const todayStr = new Date().toISOString().split('T')[0];
-  const isNextDisabled = timeFilter === 'all' || (currentRange && currentRange.end >= todayStr);
-  const isPrevDisabled = timeFilter === 'all' || transactions.length === 0;
+  // Deshabilitamos "Anterior" SOLO si estamos en el "Histórico Completo" (all)
+  const isPrevDisabled = timeFilter === 'all';
 
+  // Deshabilitamos "Siguiente" si estamos en Histórico, 
+  // o si el final de nuestro rango actual ya superó o igualó el día de hoy (para no viajar al futuro)
+  const isNextDisabled = timeFilter === 'all' || (
+    currentRange?.end && new Date(`${currentRange.end}T23:59:59`) >= new Date()
+  );
   return (
     <div className="flex flex-col w-full">
-      {/* 1. HEADER: Título y Botón a la misma altura (con mb-4 para alinear con la Wishlist) */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between pb-3">
         <h2 className="text-xl font-bold text-zinc-100">Transacciones</h2>
         <button
           onClick={handleActualizar}
@@ -89,14 +93,14 @@ export function TransactionTable({ currentRange, timeFilter, onNext, onPrev, onR
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse whitespace-nowrap min-w-[700px]">
             <thead>
-              <tr className="text-gray-400 text-sm border-b border-notion-border bg-notion-sidebar/50">
+              <tr className="text-gray-400 text-base border-b border-notion-border bg-notion-sidebar/50">
                 <th className="px-4 py-3 font-medium flex items-center gap-2">📅 fecha</th>
-                <th className="px-4 py-3 font-medium"># Monto</th>
-                <th className="px-4 py-3 font-medium"># Bolivares</th>
-                <th className="px-4 py-3 font-medium">≡ Tipo</th>
-                <th className="px-4 py-3 font-medium">⊙ Activo</th>
-                <th className="px-4 py-3 font-medium">⚙ Estado</th>
-                <th className="px-4 py-3 font-medium">Aa ID orden</th>
+                <th className="px-4 py-3 font-medium">Monto</th>
+                <th className="px-4 py-3 font-medium">Bolivares</th>
+                <th className="px-4 py-3 font-medium">Tipo</th>
+                <th className="px-4 py-3 font-medium">Activo</th>
+                <th className="px-4 py-3 font-medium">Estado</th>
+                <th className="px-4 py-3 font-medium">ID orden</th>
               </tr>
             </thead>
             <tbody className="text-sm divide-y divide-notion-border">
@@ -170,7 +174,6 @@ export function TransactionTable({ currentRange, timeFilter, onNext, onPrev, onR
               </button>
             </div>
           </div>
-
         </div>
       </div>
     </div>

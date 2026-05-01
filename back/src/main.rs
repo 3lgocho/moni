@@ -2,7 +2,7 @@ mod models;
 mod scraper;
 mod handlers;
 
-use axum::{http::Method, routing::{get, post}, Json, Router};
+use axum::{http::Method, routing::{get, post, put, patch, delete}, Json, Router};
 use models::Transaction;
 use sqlx::{mysql::MySqlPoolOptions, MySqlPool};
 use std::env;
@@ -39,7 +39,7 @@ async fn main() {
     // 4. Configurar CORS (Para que React en el puerto 5173 pueda pedir datos al puerto 3000 sin bloqueo)
     let cors = CorsLayer::new()
         .allow_origin(Any) // En producción esto se restringe
-        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
+        .allow_methods(Any)
         .allow_headers(Any);
 
     // 5. Configurar las rutas y pasarle el "pool" de la BD
@@ -48,6 +48,10 @@ async fn main() {
         .route("/api/stats", get(handlers::get_stats))
         .route("/api/summary", get(handlers::get_summary))
         .route("/api/scrape", post(handlers::trigger_scrape))
+        // NUEVAS RUTAS DE WISHLIST
+        .route("/api/wishlist", get(handlers::get_wishlist).post(handlers::add_wishlist_item))
+        .route("/api/wishlist/{id}", put(handlers::update_wishlist_item).delete(handlers::delete_wishlist_item))
+        .route("/api/wishlist/{id}/toggle", patch(handlers::toggle_wishlist_item))
         .layer(cors)
         .with_state(pool); // Inyectamos la conexión a la base de datos en Axum
 

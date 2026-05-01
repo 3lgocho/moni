@@ -272,6 +272,44 @@ pub async fn sync_total_balance(pool: &MySqlPool) -> Result<(), Box<dyn std::err
     println!("✅ Balance Sincronizado: {} {} (Spot: {}, Funding: {}, Earn: {})", gran_total, asset_target, spot_total, funding_total, earn_total);
 
     Ok(())
+   
+}
 
-    
+// Agrega esto al final de tu src/scraper.rs
+// Agrega esto al final de tu src/scraper.rs
+pub async fn fetch_title_or_fallback(input: &str) -> String {
+    if !input.starts_with("http://") && !input.starts_with("https://") {
+        return input.to_string();
+    }
+
+    // 1. Agregamos un TIMEOUT de 5 segundos para no colgar el servidor
+    let client = reqwest::Client::builder()
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .unwrap_or_default();
+
+    match client.get(input).send().await {
+        Ok(res) if res.status().is_success() => {
+            if let Ok(html) = res.text().await {
+                
+                // 2. Buscar <title>
+                if let Some(start_tag) = html.find("<title>") {
+                    if let Some(end_tag) = html[start_tag..].find("</title>") {
+                        let raw_title = &html[start_tag + 7..start_tag + end_tag];
+                        let clean_title = raw_title.trim();
+                        
+                        // 3. EL FIX MAGISTRAL: Si el título quedó vacío, fallback al link
+                        if !clean_title.is_empty() {
+                            return clean_title.to_string(); 
+                        }
+                    }
+                }
+            }
+            // Retorno si el HTML no tiene <title> o si estaba vacío
+            input.to_string() 
+        }
+        // Retorno si la página da error 404, 403 o da Timeout
+        _ => input.to_string(), 
+    }
 }

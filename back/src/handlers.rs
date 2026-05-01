@@ -1,8 +1,10 @@
-use axum::{extract::{State, Query}, response::IntoResponse, Json};
-use sqlx::MySqlPool;
-
+use axum::{extract::{State, Query}, response::IntoResponse, Json, http::StatusCode};
+use crate::scraper::fetch_title_or_fallback;
 use crate::models::{Transaction, PaginationQuery, SummaryQuery, FinancialSummary, DashboardStats};
 use rust_decimal::Decimal;
+use serde::Deserialize;
+use sqlx::MySqlPool;
+use uuid::Uuid;
 
 // 1. GET TRANSACTIONS (Paginado y Filtrado por Fechas)
 pub async fn get_transactions(
@@ -14,7 +16,6 @@ pub async fn get_transactions(
     let offset = params.offset.unwrap_or(0);
 
     let transactions = if let (Some(start), Some(end)) = (&params.start_date, &params.end_date) {
-        // Ejecutamos la consulta inyectando (.bind) las variables start y end
         sqlx::query_as::<_, Transaction>(
             r#"SELECT id, fecha, monto, total_fiat, tipo, activo, estado, id_orden 
                FROM transactions 
@@ -29,7 +30,6 @@ pub async fn get_transactions(
         .await
         .map_err(|e| e.to_string())?
     } else {
-        // Consulta por defecto si no mandan fechas
         sqlx::query_as::<_, Transaction>(
             r#"SELECT id, fecha, monto, total_fiat, tipo, activo, estado, id_orden 
                FROM transactions 
@@ -79,7 +79,7 @@ pub async fn get_summary(
     Ok(Json(summary))
 }
 
-// 3. GET STATS (El global que tenías originalmente, necesario para el "Total Balance")
+// 3. GET STATS 
 pub async fn get_stats(State(pool): State<MySqlPool>) -> impl IntoResponse {
     let last_balance = sqlx::query_scalar!(
         "SELECT total_amount FROM balance_snapshots ORDER BY fecha_registro DESC LIMIT 1"
@@ -126,4 +126,136 @@ pub async fn trigger_scrape(
     }
     
     Ok(Json("Scraping ejecutado y base de datos actualizada".to_string()))
+}
+
+// ==========================================
+// 5. WISHLIST 
+// ==========================================
+#[derive(Deserialize)]
+pub struct CreateWishlistItem {
+    pub nombre: String,
+    pub precio_usd: f64,
+    pub prioridad: String,
+}
+
+pub async fn add_wishlist_item(
+    State(pool): State<MySqlPool>, 
+    Json(payload): Json<CreateWishlistItem>,
+) -> impl IntoResponse {
+    
+    let es_link = payload.nombre.starts_with("http");
+    let link_final = if es_link { Some(payload.nombre.clone()) } else { None };
+    
+    let nombre_final = fetch_title_or_fallback(&payload.nombre).await;
+    
+    let new_id = Uuid::new_v4().to_string();
+    
+    let result = sqlx::query!(
+        "INSERT INTO wishlist (id, nombre, precio_usd, prioridad, link, comprado) VALUES (?, ?, ?, ?, ?, false)",
+        new_id,
+        nombre_final,
+        payload.precio_usd,
+        payload.prioridad,
+        link_final
+    )
+    .execute(&pool)
+    .await;
+
+    match result {
+        Ok(_) => {
+            (StatusCode::CREATED, Json(serde_json::json!({
+                "id": new_id,
+                "nombre": nombre_final,
+                "precio_usd": payload.precio_usd,
+                "prioridad": payload.prioridad,
+                "link": link_final,
+                "comprado": false
+            })))
+        },
+        Err(e) => {
+            eprintln!("Error insertando en wishlist: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!("Error al guardar en la BD")))
+        }
+    }
+}
+
+// ==========================================
+// 6. OBTENER WISHLIST (GET)
+// ==========================================
+pub async fn get_wishlist(
+    State(pool): State<MySqlPool>,
+) -> Result<Json<Vec<serde_json::Value>>, String> {
+    // Obtenemos todos los ítems de la base de datos
+    let items = sqlx::query!(
+        "SELECT id, nombre, precio_usd, prioridad, link, comprado FROM wishlist"
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let mut result = Vec::new();
+    for row in items {
+        result.push(serde_json::json!({
+            "id": row.id,
+            "nombre": row.nombre,
+            "precio_usd": row.precio_usd,
+            "prioridad": row.prioridad,
+            "link": row.link,
+            "comprado": row.comprado != 0 // Convertimos el 0/1 de MySQL a Booleano (true/false) para React
+        }));
+    }
+
+    Ok(Json(result))
+}
+
+// ==========================================
+// 7. ELIMINAR ÍTEM (DELETE)
+// ==========================================
+pub async fn delete_wishlist_item(
+    State(pool): State<MySqlPool>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> impl IntoResponse {
+    match sqlx::query!("DELETE FROM wishlist WHERE id = ?", id).execute(&pool).await {
+        Ok(_) => StatusCode::OK,
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+// ==========================================
+// 8. ACTUALIZAR ESTADO DE COMPRA (PATCH)
+// ==========================================
+#[derive(serde::Deserialize)]
+pub struct ToggleWishlistItem {
+    pub comprado: bool,
+}
+
+pub async fn toggle_wishlist_item(
+    State(pool): State<MySqlPool>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+    Json(payload): Json<ToggleWishlistItem>,
+) -> impl IntoResponse {
+    match sqlx::query!("UPDATE wishlist SET comprado = ? WHERE id = ?", payload.comprado, id).execute(&pool).await {
+        Ok(_) => StatusCode::OK,
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+// ==========================================
+// 9. EDITAR ÍTEM COMPLETO (PUT)
+// ==========================================
+pub async fn update_wishlist_item(
+    State(pool): State<MySqlPool>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+    Json(payload): Json<CreateWishlistItem>,
+) -> impl IntoResponse {
+    let es_link = payload.nombre.starts_with("http");
+    let link_final = if es_link { Some(payload.nombre.clone()) } else { None };
+    
+    match sqlx::query!(
+        "UPDATE wishlist SET nombre = ?, precio_usd = ?, prioridad = ?, link = ? WHERE id = ?",
+        payload.nombre, payload.precio_usd, payload.prioridad, link_final, id
+    ).execute(&pool).await {
+        Ok(_) => StatusCode::OK,
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
 }

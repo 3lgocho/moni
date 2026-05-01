@@ -35,7 +35,7 @@ function App() {
           </div>
         </header>
 
-        <div className="px-4 md:px-12 max-w-5xl w-full mx-auto">
+        <div className="px-4 md:px-12 max-w-7xl w-full mx-auto">
           {/* 4. Renderizado Condicional de las Vistas */}
 
           {activeTab === 'dashboard' && (
@@ -48,9 +48,10 @@ function App() {
               {/* GRID DE ESTADÍSTICAS */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 <StatCard title="Total Balance" value={formatCurrency(stats.total_balance)} icon={Wallet} type="neutral" subtitle="ACTUAL" />
+                <StatCard title="Flujo Neto" value={netFlowPrefix + formatCurrency(netFlow)} icon={NetFlowIcon} type={netFlowType} subtitle={filterLabels[timeFilter]} />
                 <StatCard title="Income" value={"+" + formatCurrency(summary.income)} icon={ArrowUpRight} type="income" subtitle={filterLabels[timeFilter]} />
                 <StatCard title="Outcome" value={"-" + formatCurrency(summary.outcome)} icon={ArrowDownRight} type="outcome" subtitle={filterLabels[timeFilter]} />
-                <StatCard title="Flujo Neto" value={netFlowPrefix + formatCurrency(netFlow)} icon={NetFlowIcon} type={netFlowType} subtitle={filterLabels[timeFilter]} />
+
               </div>
               <div className="flex flex-col xl:flex-row gap-8 items-start">
 
@@ -70,9 +71,7 @@ function App() {
 
                 {/* LADO DERECHO (Wishlist): Ancho fijo en pantallas muy grandes, o fluido en medianas */}
                 <div className="w-full xl:w-[350px] shrink-0">
-                  <div className="-mt-6">
-                    <WishlistGrid />
-                  </div>
+                  <WishlistGrid />
                 </div>
 
               </div>
